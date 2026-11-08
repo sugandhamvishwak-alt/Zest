@@ -147,7 +147,43 @@ function render(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
 }
 function playIds(ids,i){S.queue=ids.filter(tk);S.i=i;start()}
-function start(){const t=tk(cur());if(!t)return;au.src=t.src;au.play().catch(()=>{});bar();render()}
+
+async function start() {
+    const t = tk(cur());
+    if (!t) return;
+    
+    if (t.src.startsWith('blob:') || (t.src.startsWith('http') && !t.src.includes('SoundHelix'))) {
+        au.src = t.src;
+        au.play().catch(() => {});
+        bar();
+        render();
+        return;
+    }
+
+    try {
+        $('#npt').textContent = "Fetching stream...";
+        const searchQuery = `${t.artist} - ${t.title}`;
+        const workerUrl = `https://zest-backend.sugandhamvishwak.workers.dev/stream?q=${encodeURIComponent(searchQuery)}`;
+        
+        const res = await fetch(workerUrl);
+        const data = await res.json();
+
+        if (data.streamUrl) {
+            au.src = data.streamUrl;
+            au.play().catch(() => {});
+            t.src = data.streamUrl;
+        } else {
+            alert('Could not find a stream for this song.');
+        }
+    } catch (err) {
+        console.error('Backend streaming error:', err);
+        alert('Failed to connect to Zest backend proxy.');
+    }
+
+    bar();
+    render();
+}
+
 function bar(){
   const t=tk(cur());
   $('#npt').textContent=t?t.title:'Nothing playing';$('#npa').textContent=t?t.artist:'Pick a song';
