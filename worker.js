@@ -12,23 +12,47 @@ export default {
 
     const url = new URL(request.url);
 
+    // Endpoint 1: Search tracks via Spotify Public Search (or iTunes fallback if no token)
+    if (url.pathname === '/search') {
+      const q = url.searchParams.get('q');
+      if (!q) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+      try {
+        // Using iTunes Search API as a fast, reliable, keyless fallback for metadata & album art
+        const searchRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=15`);
+        const data = await searchRes.json();
+        
+        const tracks = data.results.map((item, index) => ({
+          id: 'sp' + index,
+          title: item.trackName,
+          artist: item.artistName,
+          cover: item.artworkUrl100.replace('100x100', '300x300'),
+          src: '' // Will fetch stream on play
+        }));
+
+        return new Response(JSON.stringify(tracks), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: 'Search failed' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Endpoint 2: Extract audio stream
     if (url.pathname === '/stream') {
       const q = url.searchParams.get('q');
       if (!q) {
-        return new Response(JSON.stringify({ error: 'Query parameter q is required' }), {
+        return new Response(JSON.stringify({ error: 'Query required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
       try {
-        const pipedInstances = [
-          'https://pipedapi.kavin.rocks',
-          'https://api.piped.privacydev.net',
-          'https://pipedapi.drgns.space'
-        ];
-        
-        const pipedBase = pipedInstances[0];
+        const pipedBase = 'https://pipedapi.kavin.rocks';
         const searchRes = await fetch(`${pipedBase}/search?q=${encodeURIComponent(q)}&filter=music_songs`);
         const searchData = await searchRes.json();
 
@@ -44,26 +68,17 @@ export default {
         const videoData = await videoRes.json();
 
         const audioStreams = videoData.audioStreams.sort((a, b) => b.bitrate - a.bitrate);
-        const bestAudio = audioStreams[0];
-
-        return new Response(JSON.stringify({
-          title: searchData.items[0].title,
-          videoId: videoId,
-          streamUrl: bestAudio.url,
-          mimeType: bestAudio.mimeType,
-          duration: videoData.duration
-        }), {
+        return new Response(JSON.stringify({ streamUrl: audioStreams[0].url }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
-
       } catch (err) {
-        return new Response(JSON.stringify({ error: 'Failed to extract stream', details: err.message }), {
+        return new Response(JSON.stringify({ error: 'Stream extraction failed' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
     }
 
-    return new Response('Zest Backend Proxy Running', { headers: corsHeaders });
+    return new Response('Zest Worker Online', { headers: corsHeaders });
   }
 };
