@@ -19,8 +19,8 @@ h2{margin:26px 0 12px;font-size:18px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
 .card{cursor:pointer;padding:10px;border-radius:14px;border:1px solid var(--line)}
 .card:hover{background:var(--soft)}
-.card .cv{aspect-ratio:1;border-radius:10px;margin-bottom:8px}
-.cv{background:linear-gradient(135deg,hsl(var(--h) 100% 55%),hsl(calc(var(--h) + 16) 100% 72%));width:44px;height:44px;border-radius:8px;flex:none}
+.card .cv{aspect-ratio:1;border-radius:10px;margin-bottom:8px;background-size:cover;background-position:center}
+.cv{background:linear-gradient(135deg,hsl(var(--h, 20) 100% 55%),hsl(calc(var(--h, 20) + 16) 100% 72%));width:44px;height:44px;border-radius:8px;flex:none;background-size:cover;background-position:center}
 .row{display:flex;align-items:center;gap:12px;padding:8px;border-radius:10px;cursor:pointer}
 .row:hover,.row.now{background:var(--soft)}
 .row.now b{color:var(--o)}
@@ -85,10 +85,11 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}};
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 
-// Starter songs: free demo tracks from SoundHelix. Swap in your own audio URLs here.
-const U='https://www.soundhelix.com/examples/mp3/SoundHelix-Song-';
+const WORKER_URL = 'https://zest-backend.sugandhamvishwak.workers.dev';
+
+// Starter demo tracks
 const names=['Golden Hour','Citrus Drive','Amber Static','Peach Fuzz','Sunday Marmalade','Ember Lines','Paper Lanterns','Late Tangerine'];
-const tracks=names.map((t,i)=>({id:'s'+i,title:t,artist:'SoundHelix',src:U+(i+1)+'.mp3'}));
+let tracks=names.map((t,i)=>({id:'s'+i,title:t,artist:'SoundHelix',cover:'',src:''}));
 
 let lib=load('lib',{playlists:[],albums:[],liked:[]});
 let cfg=load('cfg',{name:'',accent:'#ff6a1a',auto:true});
@@ -96,6 +97,7 @@ let S={view:'home',vis:[],queue:[],i:-1};
 const au=new Audio();au.volume=.8;
 const tk=id=>tracks.find(t=>t.id===id);
 const hue=t=>(tracks.indexOf(t)*13)%34+8;
+const coverStyle=t=>t && t.cover ? `background-image:url('${t.cover}')` : `--h:${t?hue(t):20}`;
 const fmt=s=>isFinite(s)?Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'):'0:00';
 const cur=()=>S.queue[S.i];
 
@@ -103,23 +105,23 @@ function applyAccent(){document.documentElement.style.setProperty('--o',cfg.acce
 
 function row(t){
   const liked=lib.liked.includes(t.id);
-  return `<div class="row ${cur()===t.id?'now':''}" data-act="play" data-id="${t.id}"><div class="cv" style="--h:${hue(t)}"></div><div class="mt"><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><button class="ic" data-act="like" data-id="${t.id}" aria-label="Like">${liked?'♥':'♡'}</button></div>`;
+  return `<div class="row ${cur()===t.id?'now':''}" data-act="play" data-id="${t.id}"><div class="cv" style="${coverStyle(t)}"></div><div class="mt"><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><button class="ic" data-act="like" data-id="${t.id}" aria-label="Like">${liked?'♥':'♡'}</button></div>`;
 }
 function list(ids){S.vis=ids;return ids.length?ids.map(i=>tk(i)).filter(Boolean).map(row).join(''):'<div class="empty">Nothing here yet.</div>'}
 function collection(c,kind){
   const ids=c.ids.filter(tk);
-  return `<div class="card" data-act="playlist" data-kind="${kind}" data-id="${c.id}"><div class="cv" style="--h:${ids[0]?hue(tk(ids[0])):20}"></div><b>${esc(c.name)}</b>${c.pub?'<span class="tag">Public</span>':''}<br><small>${ids.length} songs</small><br><button class="ic" data-act="del" data-kind="${kind}" data-id="${c.id}">Delete</button></div>`;
+  return `<div class="card" data-act="playlist" data-kind="${kind}" data-id="${c.id}"><div class="cv" style="${ids[0]?coverStyle(tk(ids[0])):coverStyle(null)}"></div><b>${esc(c.name)}</b>${c.pub?'<span class="tag">Public</span>':''}<br><small>${ids.length} songs</small><br><button class="ic" data-act="del" data-kind="${kind}" data-id="${c.id}">Delete</button></div>`;
 }
 const picker=()=>`<div class="pick">${tracks.map(t=>`<label><input type="checkbox" name="t" value="${t.id}"> ${esc(t.title)} <small>${esc(t.artist)}</small></label>`).join('')}</div>`;
 
 const views={
   home(){
     const h=new Date().getHours(),g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';
-    const first=tracks.slice(0,4).map(t=>`<div class="card" data-act="play" data-id="${t.id}"><div class="cv" style="--h:${hue(t)}"></div><b>${esc(t.title)}</b><br><small>${esc(t.artist)}</small></div>`).join('');
+    const first=tracks.slice(0,4).map(t=>`<div class="card" data-act="play" data-id="${t.id}"><div class="cv" style="${coverStyle(t)}"></div><b>${esc(t.title)}</b><br><small>${esc(t.artist)}</small></div>`).join('');
     S.vis=tracks.map(t=>t.id);
     return `<h1>${g}${cfg.name?', '+esc(cfg.name):''}</h1><div class="grid">${first}</div><h2>All songs</h2>${list(tracks.map(t=>t.id))}`;
   },
-  search(){return `<h1>Search</h1><input type="text" id="q" placeholder="Songs or artists" aria-label="Search" autofocus><div id="res">${list(tracks.map(t=>t.id))}</div>`},
+  search(){return `<h1>Search</h1><input type="text" id="q" placeholder="Search songs or artists" aria-label="Search" autofocus><div id="res">${list(tracks.map(t=>t.id))}</div>`},
   library(){
     const pl=lib.playlists.map(p=>collection(p,'playlists')).join('')||'<div class="empty">No playlists yet. Make one in Create.</div>';
     const al=lib.albums.map(a=>collection(a,'albums')).join('')||'<div class="empty">No albums yet. Make one in Create.</div>';
@@ -152,7 +154,7 @@ async function start() {
     const t = tk(cur());
     if (!t) return;
     
-    if (t.src.startsWith('blob:') || (t.src.startsWith('http') && !t.src.includes('SoundHelix'))) {
+    if (t.src && (t.src.startsWith('blob:') || t.src.startsWith('http'))) {
         au.src = t.src;
         au.play().catch(() => {});
         bar();
@@ -162,10 +164,9 @@ async function start() {
 
     try {
         $('#npt').textContent = "Fetching stream...";
+        bar();
         const searchQuery = `${t.artist} - ${t.title}`;
-        const workerUrl = `https://zest-backend.sugandhamvishwak.workers.dev/stream?q=${encodeURIComponent(searchQuery)}`;
-        
-        const res = await fetch(workerUrl);
+        const res = await fetch(`${WORKER_URL}/stream?q=${encodeURIComponent(searchQuery)}`);
         const data = await res.json();
 
         if (data.streamUrl) {
@@ -186,8 +187,18 @@ async function start() {
 
 function bar(){
   const t=tk(cur());
-  $('#npt').textContent=t?t.title:'Nothing playing';$('#npa').textContent=t?t.artist:'Pick a song';
-  $('#npc').style.setProperty('--h',t?hue(t):20);$('#pp').textContent=au.paused?'▶':'⏸';
+  $('#npt').textContent=t?t.title:'Nothing playing';
+  $('#npa').textContent=t?t.artist:'Pick a song';
+  
+  const npc = $('#npc');
+  if (t && t.cover) {
+    npc.style.backgroundImage = `url('${t.cover}')`;
+  } else {
+    npc.style.backgroundImage = 'none';
+    npc.style.setProperty('--h', t ? hue(t) : 20);
+  }
+  
+  $('#pp').textContent=au.paused?'▶':'⏸';
 }
 function step(d){if(!S.queue.length)return;S.i=(S.i+d+S.queue.length)%S.queue.length;start()}
 
@@ -196,36 +207,4 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const a=el.dataset.act,id=el.dataset.id;
   if(a==='like'){e.stopPropagation();const l=lib.liked,k=l.indexOf(id);k<0?l.push(id):l.splice(k,1);save('lib',lib);render()}
-  else if(a==='play'){const k=S.vis.indexOf(id);playIds(S.vis,k)}
-  else if(a==='playlist'){const c=lib[el.dataset.kind].find(x=>x.id===id);if(c&&c.ids.some(tk))playIds(c.ids,0)}
-  else if(a==='del'){e.stopPropagation();lib[el.dataset.kind]=lib[el.dataset.kind].filter(x=>x.id!==id);save('lib',lib);render()}
-  else if(a==='accent'){cfg.accent=el.dataset.c;save('cfg',cfg);applyAccent();render()}
-  else if(a==='reset'){if(confirm('Clear everything you saved?')){lib={playlists:[],albums:[],liked:[]};cfg={name:'',accent:'#ff6a1a',auto:true};save('lib',lib);save('cfg',cfg);applyAccent();render()}}
-});
-document.addEventListener('input',e=>{
-  if(e.target.id==='q'){const q=e.target.value.toLowerCase();$('#res').innerHTML=list(tracks.filter(t=>(t.title+t.artist).toLowerCase().includes(q)).map(t=>t.id))}
-  if(e.target.id==='nm'){cfg.name=e.target.value;save('cfg',cfg)}
-});
-document.addEventListener('change',e=>{if(e.target.id==='auto'){cfg.auto=e.target.checked;save('cfg',cfg)}});
-document.addEventListener('submit',e=>{
-  e.preventDefault();const f=e.target,d=new FormData(f),k=f.dataset.form;
-  const ids=d.getAll('t');
-  if(k==='song'){const file=d.get('f');if(!file||!file.size)return;
-    tracks.push({id:'u'+Date.now(),title:d.get('title'),artist:d.get('artist')||'Unknown artist',src:URL.createObjectURL(file)});
-    S.view='home';render()}
-  else{const c={id:'c'+Date.now(),name:d.get('name'),ids,pub:!!d.get('pub')};
-    lib[k==='playlist'?'playlists':'albums'].push(c);save('lib',lib);S.view='library';render()}
-});
-
-$('#pp').onclick=()=>{if(!au.src){playIds(tracks.map(t=>t.id),0);return}au.paused?au.play():au.pause()};
-$('#pv').onclick=()=>step(-1);$('#nx').onclick=()=>step(1);
-$('#vl').oninput=e=>au.volume=e.target.value;
-$('#seek').oninput=e=>{if(au.duration)au.currentTime=au.duration*e.target.value/100};
-au.onplay=au.onpause=bar;
-au.ontimeupdate=()=>{$('#cur').textContent=fmt(au.currentTime);$('#dur').textContent=fmt(au.duration);$('#seek').value=au.duration?au.currentTime/au.duration*100:0};
-au.onended=()=>{if(cfg.auto)step(1)};
-
-applyAccent();render();
-</script>
-</body>
-</html>
+  else if
