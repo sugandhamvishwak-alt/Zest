@@ -1,5 +1,6 @@
 {
-  "appId": "com.vishwak.zest",
+  "appId": "com.zest.music",
   "appName": "Zest",
-  "webDir": "www"
+  "webDir": ".",
+  "bundledWebRuntime": false
 }
