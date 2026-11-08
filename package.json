@@ -1,0 +1,11 @@
+{
+  "name": "zest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zest: an orange-and-white music streaming app",
+  "license": "MIT",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  }
+}
