@@ -28,7 +28,7 @@ h2{margin:26px 0 12px;font-size:18px}
 .mt b,.mt small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 small{color:var(--mut)}
 .ic{all:unset;cursor:pointer;color:var(--o);font-size:18px;padding:4px 8px}
-.btn{all:unset;cursor:pointer;background:var(--o);color:#fff;padding:9px 18px;border-radius:99px;font-weight:700}
+.btn{all:unset;cursor:pointer;background:var(--o);color:#fff;padding:9px 18px;border-radius:99px;font-weight:700;display:inline-block;text-align:center}
 .btn.ghost{background:none;color:var(--o);border:1.5px solid var(--o)}
 input[type=text],input[type=file]{width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:10px;font:inherit;margin-bottom:10px}
 input[type=text]:focus{outline:2px solid var(--o);border-color:var(--o)}
@@ -51,7 +51,7 @@ input[type=range]{accent-color:var(--o);flex:1;min-width:0}
 :focus-visible{outline:2px solid var(--o);outline-offset:2px}
 @media(max-width:720px){
 body{grid-template-columns:1fr;grid-template-rows:1fr 76px 58px;grid-template-areas:"main" "bar" "nav"}
-nav{flex-direction:row;padding:6px;border-right:0;border-top:1px solid var(--line);justify-content:space-around}
+nav{flex-direction:row;padding:6px;border-right:0;border-top:1px solid var(--line);justify-space-around}
 .logo{display:none}
 nav button{padding:8px 10px;font-size:13px}
 main{padding:18px}
@@ -86,8 +86,11 @@ const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{retur
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 
 const WORKER_URL = 'https://zest-backend.sugandhamvishwak.workers.dev';
+const SPOTIFY_CLIENT_ID = 'ad26e111be6d44b3a3c326118e681df4';
 
-// Starter demo tracks
+let spotifyToken = localStorage.getItem('sp_token') || null;
+
+// Starter tracks
 const names=['Golden Hour','Citrus Drive','Amber Static','Peach Fuzz','Sunday Marmalade','Ember Lines','Paper Lanterns','Late Tangerine'];
 let tracks=names.map((t,i)=>({id:'s'+i,title:t,artist:'SoundHelix',cover:'',src:''}));
 
@@ -100,6 +103,35 @@ const hue=t=>(tracks.indexOf(t)*13)%34+8;
 const coverStyle=t=>t && t.cover ? `background-image:url('${t.cover}')` : `--h:${t?hue(t):20}`;
 const fmt=s=>isFinite(s)?Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'):'0:00';
 const cur=()=>S.queue[S.i];
+
+function loginSpotify() {
+    const redirectUri = window.location.origin + window.location.pathname;
+    const scopes = ['user-library-read', 'playlist-read-private', 'user-top-read'];
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&show_dialog=true`; window.location.href = authUrl; }  function handleOAuthHash() { const hash = window.location.hash.substring(1); const params = new URLSearchParams(hash); const token = params.get('access_token'); if (token) { spotifyToken = token; localStorage.setItem('sp_token', token); window.location.hash = ''; fetchSpotifyLibrary(); } }  async function fetchSpotifyLibrary() { if (!spotifyToken) return; try { const res = await fetch('https://api.spotify.com/v1/me/tracks?limit=20', { headers: { 'Authorization': `Bearer ${spotifyToken}` }
+        });
+        const data = await res.json();
+        if (data.items) {
+            const importedTracks = data.items.map((item, index) => ({
+                id: 'sp_user_' + index,
+                title: item.track.name,
+                artist: item.track.artists.map(a => a.name).join(', '),
+                cover: item.track.album.images[0]?.url || '',
+                src: ''
+            }));
+            
+            importedTracks.forEach(it => {
+                if (!tracks.some(t => t.title === it.title && t.artist === it.artist)) {
+                    tracks.push(it);
+                    if (!lib.liked.includes(it.id)) lib.liked.push(it.id);
+                }
+            });
+            save('lib', lib);
+            render();
+        }
+    } catch (err) {
+        console.error('Failed to sync Spotify library:', err);
+    }
+}
 
 function applyAccent(){document.documentElement.style.setProperty('--o',cfg.accent)}
 
@@ -123,9 +155,10 @@ const views={
   },
   search(){return `<h1>Search</h1><input type="text" id="q" placeholder="Search songs or artists" aria-label="Search" autofocus><div id="res">${list(tracks.map(t=>t.id))}</div>`},
   library(){
+    const syncBtn = spotifyToken ? `<button class="btn ghost" data-act="sync-spotify">Sync Spotify</button>` : `<button class="btn" data-act="login-spotify">Connect Spotify</button>`;
     const pl=lib.playlists.map(p=>collection(p,'playlists')).join('')||'<div class="empty">No playlists yet. Make one in Create.</div>';
     const al=lib.albums.map(a=>collection(a,'albums')).join('')||'<div class="empty">No albums yet. Make one in Create.</div>';
-    return `<h1>Your library</h1><h2>Liked songs</h2>${list(lib.liked)}<h2>Playlists</h2><div class="grid">${pl}</div><h2>Albums</h2><div class="grid">${al}</div>`;
+    return `<h1>Your library ${syncBtn}</h1><h2>Liked songs</h2>${list(lib.liked)}<h2>Playlists</h2><div class="grid">${pl}</div><h2>Albums</h2><div class="grid">${al}</div>`;
   },
   create(){return `<h1>Create</h1>
     <form class="box" data-form="song"><b>Add your own song</b><br><small>Songs you add last until you close the tab.</small><br><br>
@@ -136,75 +169,9 @@ const views={
     <form class="box" data-form="album"><b>New album</b><br><br><input type="text" name="name" placeholder="Album name" required>${picker()}<button class="btn">Save album</button></form>`},
   settings(){
     const cols=['#ff6a1a','#ff8a00','#f2541b','#e8590c','#ffb000'];
+    const spStatus = spotifyToken ? 'Connected ✅' : 'Not Connected';
     return `<h1>Settings</h1>
+    <div class="box"><b>Spotify Account</b><br><small>Status: ${spStatus}</small><br><br><button class="btn" data-act="login-spotify">${spotifyToken ? 'Reconnect Spotify' : 'Connect Spotify Account'}</button></div>
     <div class="box"><b>Your name</b><br><br><input type="text" id="nm" value="${esc(cfg.name)}" placeholder="What should we call you?"></div>
     <div class="box"><b>Accent colour</b><br><br>${cols.map(c=>`<span class="sw ${c===cfg.accent?'on':''}" style="background:${c}" data-act="accent" data-c="${c}" role="button" aria-label="Accent ${c}"></span>`).join('')}</div>
-    <div class="box"><label><input type="checkbox" id="auto" ${cfg.auto?'checked':''}> Play the next song automatically</label></div>
-    <div class="box"><button class="btn ghost" data-act="reset">Clear my library and settings</button></div>`;
-  }
-};
-
-function render(){
-  $('#main').innerHTML=views[S.view]();
-  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
-}
-function playIds(ids,i){S.queue=ids.filter(tk);S.i=i;start()}
-
-async function start() {
-    const t = tk(cur());
-    if (!t) return;
-    
-    if (t.src && (t.src.startsWith('blob:') || t.src.startsWith('http'))) {
-        au.src = t.src;
-        au.play().catch(() => {});
-        bar();
-        render();
-        return;
-    }
-
-    try {
-        $('#npt').textContent = "Fetching stream...";
-        bar();
-        const searchQuery = `${t.artist} - ${t.title}`;
-        const res = await fetch(`${WORKER_URL}/stream?q=${encodeURIComponent(searchQuery)}`);
-        const data = await res.json();
-
-        if (data.streamUrl) {
-            au.src = data.streamUrl;
-            au.play().catch(() => {});
-            t.src = data.streamUrl;
-        } else {
-            alert('Could not find a stream for this song.');
-        }
-    } catch (err) {
-        console.error('Backend streaming error:', err);
-        alert('Failed to connect to Zest backend proxy.');
-    }
-
-    bar();
-    render();
-}
-
-function bar(){
-  const t=tk(cur());
-  $('#npt').textContent=t?t.title:'Nothing playing';
-  $('#npa').textContent=t?t.artist:'Pick a song';
-  
-  const npc = $('#npc');
-  if (t && t.cover) {
-    npc.style.backgroundImage = `url('${t.cover}')`;
-  } else {
-    npc.style.backgroundImage = 'none';
-    npc.style.setProperty('--h', t ? hue(t) : 20);
-  }
-  
-  $('#pp').textContent=au.paused?'▶':'⏸';
-}
-function step(d){if(!S.queue.length)return;S.i=(S.i+d+S.queue.length)%S.queue.length;start()}
-
-document.addEventListener('click',e=>{
-  const nb=e.target.closest('nav button');if(nb){S.view=nb.dataset.v;render();return}
-  const el=e.target.closest('[data-act]');if(!el)return;
-  const a=el.dataset.act,id=el.dataset.id;
-  if(a==='like'){e.stopPropagation();const l=lib.liked,k=l.indexOf(id);k<0?l.push(id):l.splice(k,1);save('lib',lib);render()}
-  else if
+    <div class="box"><label><input type="checkbox" id="auto" ${cfg.auto?'checked':''}> Play the next song automatically</
