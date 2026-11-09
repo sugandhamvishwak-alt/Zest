@@ -177,7 +177,7 @@ const views={
     const syncBtn = spotifyToken ? `<button class="btn ghost" data-act="sync-spotify">Sync Spotify</button>` : `<button class="btn" data-act="login-spotify">Connect Spotify</button>`;
     const pl=lib.playlists.map(p=>collection(p,'playlists')).join('')||'<div class="empty">No playlists yet. Make one in Create.</div>';
     const al=lib.albums.map(a=>collection(a,'albums')).join('')||'<div class="empty">No albums yet. Make one in Create.</div>';
-    return `<h1>Your library ${syncBtn}</h1><h2>Liked songs</h2>${list(lib.liked)}<h2>Playlists</h2><div class="grid">${pl}</h2><h2>Albums</h2><div class="grid">${al}</div>`;
+    return `<h1>Your library ${syncBtn}</h1><h2>Liked songs</h2>${list(lib.liked)}<h2>Playlists</h2><div class="grid">${pl}</div><h2>Albums</h2><div class="grid">${al}</div>`;
   },
   create(){return `<h1>Create</h1>
     <form class="box" data-form="song"><b>Add your own song</b><br><small>Songs you add last until you close the tab.</small><br><br>
@@ -321,3 +321,5 @@ applyAccent();
 render();
 if (spotifyToken) fetchSpotifyLibrary();
 </script>
+</body>
+</html>
