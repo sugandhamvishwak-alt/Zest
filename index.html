@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ff6a1a">
 <title>Zest</title>
 <style>
 :root{--o:#ff6a1a;--bg:#fff;--ink:#2a1a10;--mut:#8a6f5e;--soft:#fff3ea;--line:#f4dccb}
@@ -19,8 +20,8 @@ h2{margin:26px 0 12px;font-size:18px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
 .card{cursor:pointer;padding:10px;border-radius:14px;border:1px solid var(--line)}
 .card:hover{background:var(--soft)}
-.card .cv{aspect-ratio:1;border-radius:10px;margin-bottom:8px;background-size:cover;background-position:center}
-.cv{background:linear-gradient(135deg,hsl(var(--h, 20) 100% 55%),hsl(calc(var(--h, 20) + 16) 100% 72%));width:44px;height:44px;border-radius:8px;flex:none;background-size:cover;background-position:center}
+.card .cv{aspect-ratio:1;border-radius:10px;margin-bottom:8px}
+.cv{background:linear-gradient(135deg,hsl(var(--h) 100% 55%),hsl(calc(var(--h) + 16) 100% 72%));width:44px;height:44px;border-radius:8px;flex:none}
 .row{display:flex;align-items:center;gap:12px;padding:8px;border-radius:10px;cursor:pointer}
 .row:hover,.row.now{background:var(--soft)}
 .row.now b{color:var(--o)}
@@ -28,7 +29,7 @@ h2{margin:26px 0 12px;font-size:18px}
 .mt b,.mt small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 small{color:var(--mut)}
 .ic{all:unset;cursor:pointer;color:var(--o);font-size:18px;padding:4px 8px}
-.btn{all:unset;cursor:pointer;background:var(--o);color:#fff;padding:9px 18px;border-radius:99px;font-weight:700;display:inline-block;text-align:center}
+.btn{all:unset;cursor:pointer;background:var(--o);color:#fff;padding:9px 18px;border-radius:99px;font-weight:700}
 .btn.ghost{background:none;color:var(--o);border:1.5px solid var(--o)}
 input[type=text],input[type=file]{width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:10px;font:inherit;margin-bottom:10px}
 input[type=text]:focus{outline:2px solid var(--o);border-color:var(--o)}
@@ -51,13 +52,28 @@ input[type=range]{accent-color:var(--o);flex:1;min-width:0}
 :focus-visible{outline:2px solid var(--o);outline-offset:2px}
 @media(max-width:720px){
 body{grid-template-columns:1fr;grid-template-rows:1fr 76px 58px;grid-template-areas:"main" "bar" "nav"}
-nav{flex-direction:row;padding:6px;border-right:0;border-top:1px solid var(--line);justify-space-around}
+nav{flex-direction:row;padding:6px;border-right:0;border-top:1px solid var(--line);justify-content:space-around}
 .logo{display:none}
 nav button{padding:8px 10px;font-size:13px}
 main{padding:18px}
 #bar{grid-template-columns:1fr auto;padding:0 12px}
 #sk,#vol{display:none}
 }
+/* app feel: safe areas for notches and gesture bars, no text selection on controls */
+*{-webkit-tap-highlight-color:transparent}
+body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+nav,#bar{user-select:none;-webkit-user-select:none}
+/* queue drawer + recently played strip */
+#qd{position:fixed;right:0;top:0;bottom:84px;width:min(340px,100%);background:#fff;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(42,26,16,.1);display:flex;flex-direction:column;z-index:5;transform:translateX(105%);visibility:hidden;transition:transform .25s,visibility .25s}
+#qd.open{transform:none;visibility:visible}
+.qh{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+#ql{flex:1;overflow:auto;padding:8px}
+.row.past{opacity:.55}
+.strip{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px}
+.strip .card{flex:0 0 140px}
+#qb[aria-expanded=true]{background:var(--soft);border-radius:8px}
+@media(max-width:720px){#qd{bottom:134px}}
+@media(prefers-reduced-motion:reduce){#qd{transition:none}}
 </style>
 </head>
 <body>
@@ -73,11 +89,13 @@ main{padding:18px}
 <div id="bar">
   <div id="np"><div class="cv" id="npc" style="--h:20"></div><div class="mt"><b id="npt">Nothing playing</b><small id="npa">Pick a song</small></div></div>
   <div id="ctl">
-    <div><button class="ic" id="pv" aria-label="Previous">⏮</button><button id="pp" aria-label="Play or pause">▶</button><button class="ic" id="nx" aria-label="Next">⏭</button></div>
+    <div><button class="ic" id="pv" aria-label="Previous">⏮</button><button id="pp" aria-label="Play or pause">▶</button><button class="ic" id="nx" aria-label="Next">⏭</button><button class="ic" id="qb" data-act="qtoggle" aria-label="Queue" aria-expanded="false">☰</button></div>
     <div id="sk"><span id="cur">0:00</span><input type="range" id="seek" min="0" max="100" value="0" aria-label="Seek"><span id="dur">0:00</span></div>
   </div>
   <div id="vol"><input type="range" id="vl" min="0" max="1" step=".01" value=".8" aria-label="Volume"></div>
 </div>
+
+<aside id="qd" aria-label="Playback queue"><div class="qh"><b>Queue</b><span><button class="ic" data-act="qclear">Clear next</button><button class="ic" data-act="qtoggle" aria-label="Close queue">✕</button></span></div><div id="ql"></div></aside>
 
 <script>
 const $=s=>document.querySelector(s);
@@ -85,83 +103,30 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}};
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 
-const WORKER_URL = 'https://zest-backend.sugandhamvishwak.workers.dev';
-const SPOTIFY_CLIENT_ID = 'ad26e111be6d44b3a3c326118e681df4';
-
-let spotifyToken = localStorage.getItem('sp_token') || null;
-
-// Starter tracks
+// Starter songs: free demo tracks from SoundHelix. Swap in your own audio URLs here.
+const U='https://www.soundhelix.com/examples/mp3/SoundHelix-Song-';
 const names=['Golden Hour','Citrus Drive','Amber Static','Peach Fuzz','Sunday Marmalade','Ember Lines','Paper Lanterns','Late Tangerine'];
-let tracks=names.map((t,i)=>({id:'s'+i,title:t,artist:'SoundHelix',cover:'',src:''}));
+const tracks=names.map((t,i)=>({id:'s'+i,title:t,artist:'SoundHelix',src:U+(i+1)+'.mp3'}));
 
 let lib=load('lib',{playlists:[],albums:[],liked:[]});
 let cfg=load('cfg',{name:'',accent:'#ff6a1a',auto:true});
-let S={view:'home',vis:[],queue:[],i:-1};
+let S={view:'home',vis:[],queue:[],i:-1,hist:[]};
 const au=new Audio();au.volume=.8;
 const tk=id=>tracks.find(t=>t.id===id);
 const hue=t=>(tracks.indexOf(t)*13)%34+8;
 const fmt=s=>isFinite(s)?Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'):'0:00';
 const cur=()=>S.queue[S.i];
 
-function loginSpotify() {
-    const redirectUri = window.location.origin + window.location.pathname;
-    const scopes = ['user-library-read', 'playlist-read-private', 'user-top-read'];
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&show_dialog=true`;
-    window.location.href = authUrl;
-}
-
-function handleOAuthHash() {
-    const hash = window.location.hash.substring(1);
-    const params = new URLSearchParams(hash);
-    const token = params.get('access_token');
-    if (token) {
-        spotifyToken = token;
-        localStorage.setItem('sp_token', token);
-        window.location.hash = '';
-        fetchSpotifyLibrary();
-    }
-}
-
-async function fetchSpotifyLibrary() {
-    if (!spotifyToken) return;
-    try {
-        const res = await fetch('https://api.spotify.com/v1/me/tracks?limit=20', {
-            headers: { 'Authorization': `Bearer ${spotifyToken}` }
-        });
-        const data = await res.json();
-        if (data.items) {
-            const importedTracks = data.items.map((item, index) => ({
-                id: 'sp_user_' + index,
-                title: item.track.name,
-                artist: item.track.artists.map(a => a.name).join(', '),
-                cover: item.track.album.images[0]?.url || '',
-                src: ''
-            }));
-            
-            importedTracks.forEach(it => {
-                if (!tracks.some(t => t.title === it.title && t.artist === it.artist)) {
-                    tracks.push(it);
-                    if (!lib.liked.includes(it.id)) lib.liked.push(it.id);
-                }
-            });
-            save('lib', lib);
-            render();
-        }
-    } catch (err) {
-        console.error('Failed to sync Spotify library:', err);
-    }
-}
-
 function applyAccent(){document.documentElement.style.setProperty('--o',cfg.accent)}
 
 function row(t){
   const liked=lib.liked.includes(t.id);
-  return `<div class="row ${cur()===t.id?'now':''}" data-act="play" data-id="${t.id}"><div class="cv" style="--h:${hue(t)}"></div><div class="mt"><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><button class="ic" data-act="like" data-id="${t.id}" aria-label="Like">${liked?'♥':'♡'}</button></div>`;
+  return `<div class="row ${cur()===t.id?'now':''}" data-act="play" data-id="${t.id}"><div class="cv" style="--h:${hue(t)}"></div><div class="mt"><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><button class="ic" data-act="qadd" data-id="${t.id}" aria-label="Add to queue">+</button><button class="ic" data-act="like" data-id="${t.id}" aria-label="Like">${liked?'♥':'♡'}</button></div>`;
 }
 function list(ids){S.vis=ids;return ids.length?ids.map(i=>tk(i)).filter(Boolean).map(row).join(''):'<div class="empty">Nothing here yet.</div>'}
 function collection(c,kind){
   const ids=c.ids.filter(tk);
-  return `<div class="card" data-act="playlist" data-kind="${kind}" data-id="${c.id}"><div class="cv" style="--h:20"></div><b>${esc(c.name)}</b>${c.pub?'<span class="tag">Public</span>':''}<br><small>${ids.length} songs</small><br><button class="ic" data-act="del" data-kind="${kind}" data-id="${c.id}">Delete</button></div>`;
+  return `<div class="card" data-act="playlist" data-kind="${kind}" data-id="${c.id}"><div class="cv" style="--h:${ids[0]?hue(tk(ids[0])):20}"></div><b>${esc(c.name)}</b>${c.pub?'<span class="tag">Public</span>':''}<br><small>${ids.length} songs</small><br><button class="ic" data-act="del" data-kind="${kind}" data-id="${c.id}">Delete</button></div>`;
 }
 const picker=()=>`<div class="pick">${tracks.map(t=>`<label><input type="checkbox" name="t" value="${t.id}"> ${esc(t.title)} <small>${esc(t.artist)}</small></label>`).join('')}</div>`;
 
@@ -170,14 +135,14 @@ const views={
     const h=new Date().getHours(),g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';
     const first=tracks.slice(0,4).map(t=>`<div class="card" data-act="play" data-id="${t.id}"><div class="cv" style="--h:${hue(t)}"></div><b>${esc(t.title)}</b><br><small>${esc(t.artist)}</small></div>`).join('');
     S.vis=tracks.map(t=>t.id);
-    return `<h1>${g}${cfg.name?', '+esc(cfg.name):''}</h1><div class="grid">${first}</div><h2>All songs</h2>${list(tracks.map(t=>t.id))}`;
+    const recent=S.hist.length?`<h2>Recently played</h2><div class="strip">${S.hist.map(tk).filter(Boolean).map(t=>`<div class="card" data-act="recent" data-id="${t.id}"><div class="cv" style="--h:${hue(t)}"></div><b>${esc(t.title)}</b><br><small>${esc(t.artist)}</small></div>`).join('')}</div>`:'';
+    return `<h1>${g}${cfg.name?', '+esc(cfg.name):''}</h1>${recent}${recent?'<h2>Featured</h2>':''}<div class="grid">${first}</div><h2>All songs</h2>${list(tracks.map(t=>t.id))}`;
   },
-  search(){return `<h1>Search</h1><input type="text" id="q" placeholder="Search songs or artists" aria-label="Search" autofocus><div id="res">${list(tracks.map(t=>t.id))}</div>`},
+  search(){return `<h1>Search</h1><input type="text" id="q" placeholder="Songs or artists" aria-label="Search" autofocus><div id="res">${list(tracks.map(t=>t.id))}</div>`},
   library(){
-    const syncBtn = spotifyToken ? `<button class="btn ghost" data-act="sync-spotify">Sync Spotify</button>` : `<button class="btn" data-act="login-spotify">Connect Spotify</button>`;
     const pl=lib.playlists.map(p=>collection(p,'playlists')).join('')||'<div class="empty">No playlists yet. Make one in Create.</div>';
     const al=lib.albums.map(a=>collection(a,'albums')).join('')||'<div class="empty">No albums yet. Make one in Create.</div>';
-    return `<h1>Your library ${syncBtn}</h1><h2>Liked songs</h2>${list(lib.liked)}<h2>Playlists</h2><div class="grid">${pl}</div><h2>Albums</h2><div class="grid">${al}</div>`;
+    return `<h1>Your library</h1><h2>Liked songs</h2>${list(lib.liked)}<h2>Playlists</h2><div class="grid">${pl}</div><h2>Albums</h2><div class="grid">${al}</div>`;
   },
   create(){return `<h1>Create</h1>
     <form class="box" data-form="song"><b>Add your own song</b><br><small>Songs you add last until you close the tab.</small><br><br>
@@ -188,64 +153,25 @@ const views={
     <form class="box" data-form="album"><b>New album</b><br><br><input type="text" name="name" placeholder="Album name" required>${picker()}<button class="btn">Save album</button></form>`},
   settings(){
     const cols=['#ff6a1a','#ff8a00','#f2541b','#e8590c','#ffb000'];
-    const spStatus = spotifyToken ? 'Connected ✅' : 'Not Connected';
     return `<h1>Settings</h1>
-    <div class="box"><b>Spotify Account</b><br><small>Status: ${spStatus}</small><br><br><button class="btn" data-act="login-spotify">${spotifyToken ? 'Reconnect Spotify' : 'Connect Spotify Account'}</button></div>
     <div class="box"><b>Your name</b><br><br><input type="text" id="nm" value="${esc(cfg.name)}" placeholder="What should we call you?"></div>
     <div class="box"><b>Accent colour</b><br><br>${cols.map(c=>`<span class="sw ${c===cfg.accent?'on':''}" style="background:${c}" data-act="accent" data-c="${c}" role="button" aria-label="Accent ${c}"></span>`).join('')}</div>
     <div class="box"><label><input type="checkbox" id="auto" ${cfg.auto?'checked':''}> Play the next song automatically</label></div>
+    <div class="box"><b>Backup</b><br><small>Save your playlists, albums, liked songs and settings to a file, or restore them from one.</small><br><br><button class="btn" data-act="export">Export backup</button> <button class="btn ghost" data-act="import">Import backup</button><input type="file" id="imp" accept="application/json,.json" hidden><p id="bkmsg" class="empty" role="status"></p></div>
     <div class="box"><button class="btn ghost" data-act="reset">Clear my library and settings</button></div>`;
   }
 };
 
 function render(){
-  const viewFn = views[S.view] || views.home;
-  $('#main').innerHTML = viewFn();
+  $('#main').innerHTML=views[S.view]();
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
 }
-function playIds(ids,i){S.queue=ids.filter(tk);S.i=i;start()}
-
-async function start() {
-    const t = tk(cur());
-    if (!t) return;
-    
-    if (t.src && (t.src.startsWith('blob:') || t.src.startsWith('http'))) {
-        au.src = t.src;
-        au.play().catch(() => {});
-        bar();
-        render();
-        return;
-    }
-
-    try {
-        $('#npt').textContent = "Fetching stream...";
-        bar();
-        const searchQuery = `${t.artist} - ${t.title}`;
-        const res = await fetch(`${WORKER_URL}/stream?q=${encodeURIComponent(searchQuery)}`);
-        const data = await res.json();
-
-        if (data.streamUrl) {
-            au.src = data.streamUrl;
-            au.play().catch(() => {});
-            t.src = data.streamUrl;
-        } else {
-            alert('Could not find a stream for this song.');
-        }
-    } catch (err) {
-        console.error('Backend streaming error:', err);
-        alert('Failed to connect to Zest backend proxy.');
-    }
-
-    bar();
-    render();
-}
-
+function playIds(ids,i){const id=ids[i];S.queue=ids.filter(tk);if(!S.queue.length){S.i=-1;return}S.i=Math.max(0,S.queue.indexOf(id));start()}
+function start(){const t=tk(cur());if(!t)return;S.hist=[t.id,...S.hist.filter(x=>x!==t.id)].slice(0,12);au.src=t.src;au.play().catch(()=>{});bar();render();renderQueue()}
 function bar(){
   const t=tk(cur());
-  $('#npt').textContent=t?t.title:'Nothing playing';
-  $('#npa').textContent=t?t.artist:'Pick a song';
-  $('#npc').style.setProperty('--h',t?hue(t):20);
-  $('#pp').textContent=au.paused?'▶':'⏸';
+  $('#npt').textContent=t?t.title:'Nothing playing';$('#npa').textContent=t?t.artist:'Pick a song';
+  $('#npc').style.setProperty('--h',t?hue(t):20);$('#pp').textContent=au.paused?'▶':'⏸';
 }
 function step(d){if(!S.queue.length)return;S.i=(S.i+d+S.queue.length)%S.queue.length;start()}
 
@@ -253,55 +179,32 @@ document.addEventListener('click',e=>{
   const nb=e.target.closest('nav button');if(nb){S.view=nb.dataset.v;render();return}
   const el=e.target.closest('[data-act]');if(!el)return;
   const a=el.dataset.act,id=el.dataset.id;
-  if(a==='login-spotify'){loginSpotify();}
-  else if(a==='sync-spotify'){fetchSpotifyLibrary();}
-  else if(a==='like'){e.stopPropagation();const l=lib.liked,k=l.indexOf(id);k<0?l.push(id):l.splice(k,1);save('lib',lib);render()}
+  if(a==='like'){e.stopPropagation();const l=lib.liked,k=l.indexOf(id);k<0?l.push(id):l.splice(k,1);save('lib',lib);render()}
   else if(a==='play'){const k=S.vis.indexOf(id);playIds(S.vis,k)}
   else if(a==='playlist'){const c=lib[el.dataset.kind].find(x=>x.id===id);if(c&&c.ids.some(tk))playIds(c.ids,0)}
   else if(a==='del'){e.stopPropagation();lib[el.dataset.kind]=lib[el.dataset.kind].filter(x=>x.id!==id);save('lib',lib);render()}
   else if(a==='accent'){cfg.accent=el.dataset.c;save('cfg',cfg);applyAccent();render()}
+  else if(a==='qadd'){if(S.queue.length){S.queue.push(id);renderQueue()}else playIds([id],0)}
+  else if(a==='recent'){playIds(S.hist,S.hist.indexOf(id))}
+  else if(a==='qjump'){S.i=+el.dataset.i;start()}
+  else if(a==='qrm'){qRemove(+el.dataset.i)}
+  else if(a==='qclear'){S.queue.length=S.i<0?0:S.i+1;renderQueue()}
+  else if(a==='qtoggle'){const d=$('#qd');d.classList.toggle('open');$('#qb').setAttribute('aria-expanded',d.classList.contains('open'));renderQueue()}
+  else if(a==='export'){exportData()}
+  else if(a==='import'){$('#imp').click()}
   else if(a==='reset'){if(confirm('Clear everything you saved?')){lib={playlists:[],albums:[],liked:[]};cfg={name:'',accent:'#ff6a1a',auto:true};save('lib',lib);save('cfg',cfg);applyAccent();render()}}
 });
-
-let searchTimeout;
-document.addEventListener('input', e => {
-  if (e.target.id === 'q') {
-    const q = e.target.value.trim();
-    if (!q) {
-      $('#res').innerHTML = list(tracks.map(t => t.id));
-      return;
-    }
-    
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(async () => {
-      $('#res').innerHTML = '<div class="empty">Searching tracks...</div>';
-      try {
-        const res = await fetch(`${WORKER_URL}/search?q=${encodeURIComponent(q)}`);
-        const results = await res.json();
-        
-        if (Array.isArray(results) && results.length > 0) {
-          tracks = results;
-          $('#res').innerHTML = list(tracks.map(t => t.id));
-        } else {
-          $('#res').innerHTML = '<div class="empty">No songs found.</div>';
-        }
-      } catch (err) {
-        $('#res').innerHTML = '<div class="empty">Search failed. Check backend connection.</div>';
-      }
-    }, 400);
-  }
-  if (e.target.id === 'nm') {
-    cfg.name = e.target.value;
-    save('cfg', cfg);
-  }
+document.addEventListener('input',e=>{
+  if(e.target.id==='q'){const q=e.target.value.toLowerCase();$('#res').innerHTML=list(tracks.filter(t=>(t.title+t.artist).toLowerCase().includes(q)).map(t=>t.id))}
+  if(e.target.id==='nm'){cfg.name=e.target.value;save('cfg',cfg)}
 });
-
-document.addEventListener('change',e=>{if(e.target.id==='auto'){cfg.auto=e.target.checked;save('cfg',cfg)}});
+document.addEventListener('change',e=>{if(e.target.id==='auto'){cfg.auto=e.target.checked;save('cfg',cfg)}if(e.target.id==='imp'){const f=e.target.files[0];if(f)importData(f);e.target.value=''}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#qd').classList.remove('open');$('#qb').setAttribute('aria-expanded','false')}});
 document.addEventListener('submit',e=>{
   e.preventDefault();const f=e.target,d=new FormData(f),k=f.dataset.form;
   const ids=d.getAll('t');
   if(k==='song'){const file=d.get('f');if(!file||!file.size)return;
-    tracks.push({id:'u'+Date.now(),title:d.get('title'),artist:d.get('artist')||'Unknown artist',cover:'',src:URL.createObjectURL(file)});
+    tracks.push({id:'u'+Date.now(),title:d.get('title'),artist:d.get('artist')||'Unknown artist',src:URL.createObjectURL(file)});
     S.view='home';render()}
   else{const c={id:'c'+Date.now(),name:d.get('name'),ids,pub:!!d.get('pub')};
     lib[k==='playlist'?'playlists':'albums'].push(c);save('lib',lib);S.view='library';render()}
@@ -315,11 +218,51 @@ au.onplay=au.onpause=bar;
 au.ontimeupdate=()=>{$('#cur').textContent=fmt(au.currentTime);$('#dur').textContent=fmt(au.duration);$('#seek').value=au.duration?au.currentTime/au.duration*100:0};
 au.onended=()=>{if(cfg.auto)step(1)};
 
-// Initialize
-handleOAuthHash();
-applyAccent();
-render();
-if (spotifyToken) fetchSpotifyLibrary();
+// ---- Queue drawer ----
+function renderQueue(){
+  const el=$('#ql');if(!el)return;
+  el.innerHTML=S.queue.length?S.queue.map((id,i)=>{const t=tk(id);return `<div class="row ${i===S.i?'now':i<S.i?'past':''}" data-act="qjump" data-i="${i}"><div class="cv" style="--h:${hue(t)}"></div><div class="mt"><b>${esc(t.title)}</b><small>${i===S.i?'Now playing':i<S.i?'Played':'Up next'} · ${esc(t.artist)}</small></div><button class="ic" data-act="qrm" data-i="${i}" aria-label="Remove from queue">✕</button></div>`}).join(''):'<div class="empty">Your queue is empty. Play a song, or tap + on one.</div>';
+}
+function qRemove(i){
+  const wasCur=i===S.i;
+  S.queue.splice(i,1);
+  if(i<S.i)S.i--;
+  if(wasCur){
+    if(S.queue.length){S.i=Math.min(S.i,S.queue.length-1);start()}
+    else{au.pause();au.removeAttribute('src');au.load();S.i=-1;bar();render()}
+  }
+  renderQueue();
+}
+
+// ---- Backup: export / import ----
+function exportData(){
+  const data={app:'zest',version:1,exported:new Date().toISOString(),lib,cfg};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download='zest-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  $('#bkmsg').textContent='Backup file created.';
+}
+function importData(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    let d;
+    try{d=JSON.parse(r.result);if(!d||d.app!=='zest'||typeof d.lib!=='object'||!d.lib)throw 0}
+    catch{$('#bkmsg').textContent='That file is not a valid Zest backup.';return}
+    if(!confirm('Replace your current library and settings with this backup?'))return;
+    const arr=a=>Array.isArray(a)?a:[];
+    const coll=a=>arr(a).filter(c=>c&&typeof c.name==='string'&&Array.isArray(c.ids)).map((c,i)=>({id:String(c.id||'c'+Date.now()+i),name:c.name,ids:c.ids.map(String),pub:!!c.pub}));
+    lib={playlists:coll(d.lib.playlists),albums:coll(d.lib.albums),liked:arr(d.lib.liked).map(String)};
+    const c=d.cfg||{};
+    cfg={name:typeof c.name==='string'?c.name:'',accent:/^#[0-9a-f]{6}$/i.test(c.accent)?c.accent:'#ff6a1a',auto:c.auto!==false};
+    save('lib',lib);save('cfg',cfg);applyAccent();render();
+    $('#bkmsg').textContent='Backup restored.';
+  };
+  r.readAsText(file);
+}
+
+applyAccent();render();
 </script>
 </body>
 </html>
